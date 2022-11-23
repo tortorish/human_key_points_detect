@@ -18,7 +18,7 @@ import argparse
 sys.path.append(os.path.dirname(__file__))
 from configs import val_config
 from libs.detector.libs.detector.detector import Detector
-from utils import image_processing, debug, file_processing, torch_tools
+from utils import image_processing, debug, file_processing
 from models import inference
 
 project_root = os.path.dirname(__file__)
@@ -45,7 +45,10 @@ class PoseEstimation(inference.PoseEstimation):
         self.threshhold = threshhold
         self.detector = Detector(detect_type="ultra_person", device=device)
 
-    def start_capture(self, video_path, save_video=None, detect_freq=1):
+    def write_to_file(self, fp, points):
+        fp.write(points)
+
+    def start_capture(self, video_path=0, video_before='./vedio_before.mp4', video_after='./vedio_after.mp4', detect_freq=1):
         """
         start capture video
         :param video_path: *.avi,*.mp4,...
@@ -54,9 +57,10 @@ class PoseEstimation(inference.PoseEstimation):
         :return:
         """
         video_cap = image_processing.get_video_capture(video_path)
-        width, height, numFrames, fps = image_processing.get_video_info(video_cap)
-        if save_video:
-            self.video_writer = image_processing.get_video_writer(save_video, width, height, fps)
+        width, height, numFrames, fps = image_processing.get_video_info(video_cap)  #width:1280, height:720, fps:30
+        if video_before:
+            self.video_writer_before = image_processing.get_video_writer(video_before, width, height, fps)
+            self.vedio_writer_after = image_processing.get_video_writer(video_after, width, height, fps)
         # freq = int(fps / detect_freq)
         count = 0
         while True:
@@ -67,11 +71,19 @@ class PoseEstimation(inference.PoseEstimation):
                 kp_points, kp_scores, boxes = self.detect_image(frame,
                                                                 threshhold=self.threshhold,
                                                                 detect_person=False)
-                self.show_result(frame, boxes, kp_points, kp_scores, self.skeleton, waitKey=10)
-            if save_video:
-                self.video_writer.write(frame)
+                frame_after = self.show_result(frame, boxes, kp_points, kp_scores, self.skeleton, waitKey=10)
+                fp = open('points_coordinate.txt', 'a')
+                self.write_to_file(fp, str(kp_points[0].tolist())+'\n\n')
+
+            if video_before:
+                self.video_writer_before.write(frame)
+                self.vedio_writer_after.write(frame_after)
             count += 1
-        video_cap.release()
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                video_cap.release()
+                fp.close()
+                break
+
 
     @debug.run_time_decorator("detect_person")
     def detect_person(self, image):
@@ -121,6 +133,7 @@ class PoseEstimation(inference.PoseEstimation):
         cv2.imwrite('test.png', image)
         cv2.imshow('test', image)
         cv2.waitKey(waitKey)
+        return image
 
     def draw_keypoints(self,
                        image,
@@ -154,8 +167,9 @@ if __name__ == '__main__':
     # hp = PoseEstimation(config=val_config.person_coco_192_256, device="cuda:0")
     # 自定义COCO上半身11个关键点
     # hp = PoseEstimation(config=val_config.body_coco_192_256, device="cuda:0")
-    hp = PoseEstimation(config=val_config.body_coco_192_256, device="cpu")
+    hp = PoseEstimation(config=val_config.person_coco_192_256, device="cpu")
     image_dir = "data/test_images"
-    hp.detect_image_dir(image_dir, detect_person=True, waitKey=0)
+    #hp.detect_image_dir(image_dir, detect_person=True, waitKey=0)
+    hp.start_capture()
     # hp.start_capture(video_path=video_path, save_video=save_video)
     # hp.start_capture(video_path)
