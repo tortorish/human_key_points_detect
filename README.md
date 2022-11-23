@@ -2,3 +2,4 @@
 - vedio_before.mp4为识别前拍摄的视频
 - vedio_after.mp4为识别后拍摄的视频
 - 图片宽高默认为1280*720，帧率为30，points_coordinate.txt存储了人体17个点位的坐标，每一行代表一帧图像中的17个关键点
+- 按q退出
